@@ -1,6 +1,7 @@
 
 import { openDb } from '../db.mjs';
 import dotenv from 'dotenv';
+import axios from 'axios';
 
 
 dotenv.config()
@@ -33,10 +34,14 @@ export const createInspector = async (req, res) => {
         const { name, contact_info, postcode, brands_inspected } = req.body;
         // const latitude = 0.0; // Default value for latitude
         // const longitude = 0.0; // Default value for longitude
+        const { latitude, longitude } = await geocodePostcode(postcode);
+
+        console.log('Geocoded data:', { latitude, longitude })
+
         const db = await openDb();
         const result = await db.run(
-            'INSERT INTO inspectors (name, contact_info, postcode, brands_inspected) VALUES (?, ?, ?, ?)',
-            [name, contact_info, postcode, brands_inspected]
+            'INSERT INTO inspectors (name, contact_info, postcode, brands_inspected, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)',
+            [name, contact_info, postcode, brands_inspected, latitude, longitude]
         );
         const inspector = await db.get('SELECT * FROM inspectors WHERE id = last_insert_rowid()');
         res.json(inspector);
@@ -92,7 +97,55 @@ export const deleteInspector = async (req, res) => {
     }
 };
 
+const geocodePostcode = async (postcode) => {
+    const apiKey = process.env.OPENCAGE_API_KEY;
+    const url = `https://api.opencagedata.com/geocode/v1/json?q=${postcode}&key=${apiKey}`;
 
+    const response = await axios.get(url);
+    const { results } = response.data;
+
+    if (results && results.length > 0) {
+        const { lat, lng } = results[0].geometry;
+        return { latitude: lat, longitude: lng };
+    } else {
+        throw new Error('Geocoding failed');
+    }
+};
+
+export const getInspectorsByDistance = async (req, res) => {
+    try {
+        const { postcode } = req.query;
+
+        if (!postcode) {
+            return res.status(400).send('Missing postcode');
+        }
+
+        const { latitude, longitude } = await geocodePostcode(postcode);
+
+        const db = await openDb();
+        const inspectors = await db.all('SELECT * FROM inspectors');
+
+        const destinations = inspectors.map(inspector => `${inspector.latitude},${inspector.longitude}`).join(';');
+
+        const apiKey = process.env.DISTANCEMATRIX_API_KEY;
+        const url = `https://api-v2.distancematrix.ai/maps/api/distancematrix/json?origins=${latitude},${longitude}&destinations=${destinations}&key=${apiKey}`;
+
+        const response = await axios.get(url);
+        const distances = response.data.rows[0].elements;
+
+        const inspectorsWithDistance = inspectors.map((inspector, index) => ({
+            ...inspector,
+            distance: distances[index].distance.text,
+            duration: distances[index].duration.text
+        }));
+
+        res.json(inspectorsWithDistance);
+    } catch (error) {
+        console.error('Error fetching inspectors by distance:', error);
+        res.status(500).send('Server Error');
+    }
+
+};
 
 /*
 

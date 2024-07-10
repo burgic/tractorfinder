@@ -3,7 +3,7 @@ import bodyParser from 'body-parser';
 import { openDb } from './db.mjs';
 // import pkg from 'pg';
 // const { Pool } = pkg;
-import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector } from './controllers/inspectorController.mjs'; 
+import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector, getInspectorsByDistance } from './controllers/inspectorController.mjs'; 
 import dotenv from 'dotenv';
 import cors from 'cors';
 dotenv.config()
@@ -24,6 +24,7 @@ app.get('/api/inspectors/:id', getInspectorById);
 app.post('/api/inspectors', createInspector);
 app.put('/api/inspectors/:id', updateInspector);
 app.delete('/api/inspectors/:id', deleteInspector);
+app.get('/api/inspectors/distance', getInspectorsByDistance);
 
 const PORT = process.env.PORT || 3001;
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 function InspectorList() {
     const [inspectors, setInspectors] = useState([]);
@@ -22,7 +23,7 @@ function InspectorList() {
             <ul>
                 {inspectors.map(inspector => (
                     <li key = {inspector.id}>{inspector.name} {inspector.contact_info} {inspector.postcode} {inspector.brands_inspected}
-                    <link to = {`/edit-inspector/${inspector.id}`}>Edit</link>
+                    <Link to = {`/edit-inspector/${inspector.id}`}>Edit</Link>
                     <button onClick = {() => handleDelete(inspector.id)}>Delete</button>
                     </li>
                 ))}
