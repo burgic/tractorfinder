@@ -1,8 +1,15 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Determine the directory name in an ES module environment
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
 
 const geocodePostcode = async (postcode) => {
     const apiKey = process.env.OPENCAGE_API_KEY;

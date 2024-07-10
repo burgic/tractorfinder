@@ -1,11 +1,10 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import { openDb } from './db.mjs';
-// import pkg from 'pg';
-// const { Pool } = pkg;
-import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector, getInspectorsByDistance } from './controllers/inspectorController.mjs'; 
+import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector, getInspectorsByDistance, importInspectorsFromCSV } from './controllers/inspectorController.mjs'; 
 import dotenv from 'dotenv';
 import cors from 'cors';
+import multer from 'multer';
 dotenv.config()
 
 // configDotenv.config();
@@ -18,13 +17,18 @@ app.use(cors({
     origin: 'http://localhost:3000' // Allow requests from the React app
 }));
 
+const upload = multer({ dest: 'uploads/' });
+
 
 app.get('/api/inspectors', getInspectors);
+app.get('/api/inspectors/distance', getInspectorsByDistance); 
+app.put('/api/inspectors/:id', updateInspector);
 app.get('/api/inspectors/:id', getInspectorById);
 app.post('/api/inspectors', createInspector);
-app.put('/api/inspectors/:id', updateInspector);
 app.delete('/api/inspectors/:id', deleteInspector);
-app.get('/api/inspectors/distance', getInspectorsByDistance);
+
+
+app.post('/api/inspectors/import', upload.single('file'), importInspectorsFromCSV);
 
 const PORT = process.env.PORT || 3001;
 

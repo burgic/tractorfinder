@@ -2,9 +2,16 @@
 import { openDb } from '../db.mjs';
 import dotenv from 'dotenv';
 import axios from 'axios';
+import CSVParser from 'csv-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 
-dotenv.config()
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables from .env file
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 
 
@@ -14,7 +21,6 @@ const validateInspectorData = (data) => {
         throw new Error('Missing required fields');
     }
 };
-
 
 
 export const getInspectors = async (req, res) => {
@@ -101,6 +107,7 @@ const geocodePostcode = async (postcode) => {
     const apiKey = process.env.OPENCAGE_API_KEY;
     const url = `https://api.opencagedata.com/geocode/v1/json?q=${postcode}&key=${apiKey}`;
 
+    try {
     const response = await axios.get(url);
     const { results } = response.data;
 
@@ -110,41 +117,113 @@ const geocodePostcode = async (postcode) => {
     } else {
         throw new Error('Geocoding failed');
     }
+    } catch (error) {
+        console.error('Error in geocoding:', error.response ? error.response.data : error.message);
+        throw error;
+    }
 };
 
 export const getInspectorsByDistance = async (req, res) => {
     try {
-        const { postcode } = req.query;
+
+        console.log('Received request:', req.query);
+        
+        const { postcode, limit = 5 } = req.query;
 
         if (!postcode) {
+            console.error('Missing postcode');
             return res.status(400).send('Missing postcode');
         }
 
+        // geocode users postcode
         const { latitude, longitude } = await geocodePostcode(postcode);
+
+        console.log('User location:', { latitude, longitude });
 
         const db = await openDb();
         const inspectors = await db.all('SELECT * FROM inspectors');
+        console.log('Inspectors from DB:', inspectors);
 
-        const destinations = inspectors.map(inspector => `${inspector.latitude},${inspector.longitude}`).join(';');
+        const destinations = inspectors.map(inspector => `${inspector.latitude},${inspector.longitude}`).join('|');
+        if (!destinations) {
+            return res.status(400).send('No inspectors found');
+        }
 
         const apiKey = process.env.DISTANCEMATRIX_API_KEY;
         const url = `https://api-v2.distancematrix.ai/maps/api/distancematrix/json?origins=${latitude},${longitude}&destinations=${destinations}&key=${apiKey}`;
 
+        console.log('Distance Matrix API URL:', url);
+
         const response = await axios.get(url);
+
+        console.log('Distance Matrix API response:', response.data);
+
+        if (response.data.status !== 'OK') {
+            throw new Error(`Distance Matrix API error: ${response.data.status}`);
+        }
+
         const distances = response.data.rows[0].elements;
+
+        
 
         const inspectorsWithDistance = inspectors.map((inspector, index) => ({
             ...inspector,
-            distance: distances[index].distance.text,
-            duration: distances[index].duration.text
+            distance: distances[index].distance ? distances[index].distance.text : 'N/A',
+            duration: distances[index].duration ? distances[index].duration.text : 'N/A'
         }));
 
-        res.json(inspectorsWithDistance);
+        inspectorsWithDistance.sort((a, b) => 
+            parseFloat(a.distance.replace(' km', '')) - parseFloat(b.distance.replace(' km', ''))
+        );
+
+        const closestInspectors = inspectorsWithDistance.slice(0, parseInt(limit));
+
+        res.json(closestInspectors);
     } catch (error) {
         console.error('Error fetching inspectors by distance:', error);
         res.status(500).send('Server Error');
     }
 
+};
+
+export const importInspectorsFromCSV = async (req, res) => {
+    const filePath = req.file.path;
+    const inspectors = [];
+
+    fs.createReadStream(filePath)
+        .pipe(csvParser())
+        .on('data', async (row) => {
+            try {
+                const { name, contact_info, postcode, brands_inspected } = row;
+
+                // Geocode the postcode to get latitude and longitude
+                const { latitude, longitude } = await geocodePostcode(postcode);
+
+                inspectors.push({ name, contact_info, postcode, brands_inspected, latitude, longitude });
+            } catch (error) {
+                console.error('Error processing row:', row, error);
+            }
+        })
+        .on('end', async () => {
+            try {
+                const db = await openDb();
+                const insertStmt = db.prepare('INSERT INTO inspectors (name, contact_info, postcode, brands_inspected, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)');
+
+                db.transaction(() => {
+                    inspectors.forEach((inspector) => {
+                        insertStmt.run(inspector.name, inspector.contact_info, inspector.postcode, inspector.brands_inspected, inspector.latitude, inspector.longitude);
+                    });
+                })();
+
+                res.send('Inspectors imported successfully');
+            } catch (error) {
+                console.error('Error inserting inspectors:', error);
+                res.status(500).send('Server Error');
+            } finally {
+                // Clean up the uploaded file
+                fs.unlinkSync(filePath);
+            }
+        });
 };
 
 /*
