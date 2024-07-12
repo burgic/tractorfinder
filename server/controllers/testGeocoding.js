@@ -11,10 +11,11 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 
-const geocodePostcode = async (postcode) => {
+const geocodePostcode = async (postcode, countryCode) => {
     const apiKey = process.env.OPENCAGE_API_KEY;
-    const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(postcode)}&key=${apiKey}`;
-
+    const url = `https://api.opencagedata.com/geocode/v1/json?q=${postcode},${countryCode}&key=${apiKey}`;
+// `https://api.opencagedata.com/geocode/v1/json?q=${postcode},${countryCode}&key=${apiKey}`
+// https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(postcode)},${countryCode}&key=${apiKey}`
     try {
         const response = await axios.get(url);
         const { results } = response.data;
@@ -33,7 +34,8 @@ const geocodePostcode = async (postcode) => {
 // Test the geocodePostcode function with a sample postcode
 const testGeocode = async () => {
     const postcode = 'eh2 1je'; // Replace with a sample postcode
-    const location = await geocodePostcode(postcode);
+    const countryCode = 'GB'; // Replace with the country
+    const location = await geocodePostcode(postcode, countryCode);
     console.log('Geocoded location:', location);
 };
 

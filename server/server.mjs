@@ -1,10 +1,16 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import { openDb } from './db.mjs';
-import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector, getInspectorsByDistance, importInspectorsFromCSV } from './controllers/inspectorController.mjs'; 
+import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector, getInspectorsByDistance , getCountries } from './controllers/inspectorController.mjs'; 
+import { importInspectorsFromCSV } from './controllers/importInspectorsFromCSV.mjs';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import multer from 'multer';
+import fs from 'fs/promises';
+import path from 'path';
+import { createUploadsDir } from './config.mjs';
+
+
 
 dotenv.config()
 
@@ -12,35 +18,25 @@ dotenv.config()
 
 const app = express();
 
+
+createUploadsDir();
+
 app.use(bodyParser.json());
 
 app.use(cors({
     origin: 'http://localhost:3000' // Allow requests from the React app
 }));
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, file.originalname);
-    }
-});
 
-const upload = multer({ 
-    storage: storage,
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype !== 'text/csv') {
-            return cb(new Error('File must be a CSV'));
-        }
-        cb(null, true);
-    }
-});
 
+
+const upload = multer({ dest: 'uploads/' });
+
+app.get('/api/inspectors/distance', getInspectorsByDistance); 
 app.get('/api/inspectors/:id', getInspectorById);
 app.post('/api/inspectors/import', upload.single('file'), importInspectorsFromCSV);
 app.get('/api/inspectors', getInspectors);
-app.get('/api/inspectors/distance', getInspectorsByDistance); 
+app.get('/api/countries', getCountries);
 app.put('/api/inspectors/:id', updateInspector);
 app.post('/api/inspectors', createInspector);
 app.delete('/api/inspectors/:id', deleteInspector);
@@ -52,6 +48,30 @@ app.listen(PORT, () => {
     console.log('Server running on http://localhost:3001');
 
 });
+
+
+
+/*
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.originalname + '-' + Date.now() + '.csv');
+    }
+});
+/*
+const upload = multer({ 
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype !== 'text/csv') {
+            return cb(new Error('File must be a CSV'));
+        }
+        cb(null, true);
+    }
+});
+
+*/
 
 /*
 
