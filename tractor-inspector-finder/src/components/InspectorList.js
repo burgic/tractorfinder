@@ -23,7 +23,7 @@ function InspectorList() {
             <ul>
                 {inspectors.map(inspector => (
                     <li key={inspector.id}>
-                        {inspector.name} - {inspector.contact_info} - {inspector.postcode} - {inspector.brands_inspected}
+                        {inspector.name} | {inspector.contact_info} | {inspector.country} | {inspector.postcode} | {inspector.brands_inspected}
                         <Link to={`/edit-inspector/${inspector.id}`}>Edit</Link>
                         <button onClick={() => handleDelete(inspector.id)}>Delete</button>
                     </li>

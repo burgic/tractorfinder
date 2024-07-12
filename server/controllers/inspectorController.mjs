@@ -2,9 +2,10 @@
 import { openDb } from '../db.mjs';
 import dotenv from 'dotenv';
 import axios from 'axios';
-import CSVParser from 'csv-parser';
+import csvParser from 'csv-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,8 +17,8 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 
 const validateInspectorData = (data) => {
-    const { name, contact_info, postcode, brands_inspected } = data;
-    if (!name || !contact_info || !postcode || !brands_inspected) {
+    const { name, contact_info, postcode, country, brands_inspected } = data;
+    if (!name || !contact_info || !postcode || !country ||!brands_inspected) {
         throw new Error('Missing required fields');
     }
 };
@@ -34,13 +35,24 @@ export const getInspectors = async (req, res) => {
     }
 };
 
+const getCountryCode = async (country) => {
+    const db = await openDb();
+    const result = await db.get('SELECT country_code FROM country_codes WHERE country_name = ?', [country]);
+    if (result) {
+        return result.country_code;
+    } else {
+        throw new Error('Country code not found');
+    }
+};
+
 export const createInspector = async (req, res) => {
     try {
         validateInspectorData(req.body);
         const { name, contact_info, postcode, brands_inspected } = req.body;
+        const countryCode = await getCountryCode(country);
         // const latitude = 0.0; // Default value for latitude
         // const longitude = 0.0; // Default value for longitude
-        const { latitude, longitude } = await geocodePostcode(postcode);
+        const { latitude, longitude } = await geocodePostcode(postcode, countryCode);
 
         console.log('Geocoded data:', { latitude, longitude })
 
@@ -103,9 +115,9 @@ export const deleteInspector = async (req, res) => {
     }
 };
 
-const geocodePostcode = async (postcode) => {
+const geocodePostcode = async (postcode, countryCode) => {
     const apiKey = process.env.OPENCAGE_API_KEY;
-    const url = `https://api.opencagedata.com/geocode/v1/json?q=${postcode}&key=${apiKey}`;
+    const url = `https://api.opencagedata.com/geocode/v1/json?q=${postcode},${countryCode}&key=${apiKey}`;
 
     try {
     const response = await axios.get(url);
@@ -187,6 +199,10 @@ export const getInspectorsByDistance = async (req, res) => {
 };
 
 export const importInspectorsFromCSV = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).send('No file uploaded');
+    }
+
     const filePath = req.file.path;
     const inspectors = [];
 
@@ -194,10 +210,16 @@ export const importInspectorsFromCSV = async (req, res) => {
         .pipe(csvParser())
         .on('data', async (row) => {
             try {
-                const { name, contact_info, postcode, brands_inspected } = row;
+                const { name, contact_info, postcode, brands_inspected, latitude, longitude } = row;
 
-                // Geocode the postcode to get latitude and longitude
-                const { latitude, longitude } = await geocodePostcode(postcode);
+                let lat = latitude;
+                let lng = longitude;
+
+                if (!lat || !lng) {
+                    const geocodedData = await geocodePostcode(postcode);
+                    lat = geocodedData.latitude;
+                    lng = geocodedData.longitude;
+                }
 
                 inspectors.push({ name, contact_info, postcode, brands_inspected, latitude, longitude });
             } catch (error) {
@@ -223,10 +245,48 @@ export const importInspectorsFromCSV = async (req, res) => {
                 // Clean up the uploaded file
                 fs.unlinkSync(filePath);
             }
+        })
+        .on('error', (error) => {
+            console.error('Error reading CSV:', error);
+            res.status(400).json({ error: 'Invalid CSV file', details: error.message });
         });
 };
 
-/*
+/* 
+export const importInspectorsFromCSV = async (req, res) => {
+    const filePath = req.file.path;
+    const inspectors = [];
+
+    fs.createReadStream(filePath    
+        .pipe(csvParser())
+        .on('data', async (row) => {
+            try {
+                const { name, contact_info, postcode, brands_inspected } = row;
+                const { latitude, longitude } = await geocodePostcode(postcode);
+                inspectors.push({ name, contact_info, postcode, brands_inspected, latitude, longitude });
+            } catch (error) {
+                console.error('Error processing row:', row, error); 
+            }
+        })
+        .on('end', async () => {
+            try {
+                const db = await openDb();
+                const insertStmt = db.prepare('INSERT INTO inspectors (name, contact_info, postcode, brands_inspected, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)');
+                db.transaction(() => {
+                    inspectors.forEach((inspector) => {
+                        insertStmt.run(inspector.name, inspector.contact_info, inspector.postcode, inspector.brands_inspected, inspector.latitude, inspector.longitude);
+                    });
+                })();
+                res.send('Inspectors imported successfully');
+            } catch (error) {
+                console.error('Error inserting inspectors:', error);
+                res.status(500).send('Server Error');
+            } finally {
+                fs.unlinkSync(filePath);
+            }
+        });
+};
+
 
 export const updateInspector = async (req, res) => {
     try {

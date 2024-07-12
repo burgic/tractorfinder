@@ -5,6 +5,7 @@ import { getInspectors, createInspector, getInspectorById, updateInspector, dele
 import dotenv from 'dotenv';
 import cors from 'cors';
 import multer from 'multer';
+
 dotenv.config()
 
 // configDotenv.config();
@@ -17,18 +18,33 @@ app.use(cors({
     origin: 'http://localhost:3000' // Allow requests from the React app
 }));
 
-const upload = multer({ dest: 'uploads/' });
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.originalname);
+    }
+});
 
+const upload = multer({ 
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype !== 'text/csv') {
+            return cb(new Error('File must be a CSV'));
+        }
+        cb(null, true);
+    }
+});
 
+app.get('/api/inspectors/:id', getInspectorById);
+app.post('/api/inspectors/import', upload.single('file'), importInspectorsFromCSV);
 app.get('/api/inspectors', getInspectors);
 app.get('/api/inspectors/distance', getInspectorsByDistance); 
 app.put('/api/inspectors/:id', updateInspector);
-app.get('/api/inspectors/:id', getInspectorById);
 app.post('/api/inspectors', createInspector);
 app.delete('/api/inspectors/:id', deleteInspector);
 
-
-app.post('/api/inspectors/import', upload.single('file'), importInspectorsFromCSV);
 
 const PORT = process.env.PORT || 3001;
 
