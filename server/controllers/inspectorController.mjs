@@ -139,19 +139,43 @@ export const getInspectorsByDistance = async (req, res) => {
         const inspectors = await db.all('SELECT * FROM inspectors');
         console.log('Inspectors from DB:', inspectors);
 
-        const destinations = inspectors.map(inspector => `${inspector.latitude},${inspector.longitude}`).join('|');
+        const destinations = inspectors.map(inspector => {
+            const dest = `${inspector.latitude},${inspector.longitude}`;
+            console.log('Destination:', dest);
+            return dest;
+        }).join('|');
+
         if (!destinations) {
             return res.status(400).send('No inspectors found');
         }
 
-        const apiKey = process.env.DISTANCEMATRIX_API_KEY;
+    function getRandomApiKey() {
+        const keys = [
+            process.env.DISTANCEMATRIX_API_KEY,
+            process.env.DISTANCEMATRIX_API_KEY1,
+            process.env.DISTANCEMATRIX_API_KEY2
+        ];
+    
+        // Filter out any undefined keys
+        const validKeys = keys.filter(key => key !== undefined);
+    
+        if (validKeys.length === 0) {
+            throw new Error('No valid API keys found');
+        }
+    
+        // Randomly select one of the valid keys
+        const randomIndex = Math.floor(Math.random() * validKeys.length);
+        return validKeys[randomIndex];
+    }
+
+        const apiKey = getRandomApiKey();
         const url = `https://api-v2.distancematrix.ai/maps/api/distancematrix/json?origins=${latitude},${longitude}&destinations=${destinations}&key=${apiKey}`;
 
         console.log('Distance Matrix API URL:', url);
 
         const response = await axios.get(url);
 
-        console.log('Distance Matrix API response:', response.data);
+        console.log('Distance Matrix API response:', JSON.stringify(response.data, null,2));
 
         if (response.data.status !== 'OK') {
             throw new Error(`Distance Matrix API error: ${response.data.status}`);
@@ -159,15 +183,19 @@ export const getInspectorsByDistance = async (req, res) => {
 
         const distances = response.data.rows[0].elements;
 
+        console.log('Distances:', distances);
+
         const inspectorsWithDistance = inspectors.map((inspector, index) => ({
             ...inspector,
             distance: distances[index].distance ? distances[index].distance.text : 'N/A',
             duration: distances[index].duration ? distances[index].duration.text : 'N/A'
         }));
 
-        inspectorsWithDistance.sort((a, b) => 
-            parseFloat(a.distance.replace(' km', '')) - parseFloat(b.distance.replace(' km', ''))
-        );
+        inspectorsWithDistance.sort((a, b) => {
+            if (a.distance === 'N/A') return 1;
+            if (b.distance === 'N/A') return -1;
+            return parseFloat(a.distance.replace(' km', '')) - parseFloat(b.distance.replace(' km', ''));
+        });
 
         const closestInspectors = inspectorsWithDistance.slice(0, parseInt(limit));
 
