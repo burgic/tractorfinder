@@ -8,6 +8,9 @@ import { ImportInspectors } from './components/InspectorList.js';
 import CreateInspector from './components/CreateInspector.js';
 import EditInspector from './components/EditInspector.js';
 import InspectorFind from './components/inspectorFind.js';
+import DistanceCalculator from './components/DistanceCalculator.js';
+import InspectorFinder from './components/InspectorFinder.js';
+
 
 
 function App() {
@@ -23,6 +26,12 @@ function App() {
           </li>
           <li>
             <Link to = "/inspector-find">Find Inspector</Link>
+          </li>
+          <li>
+            <Link to = "/inspector-finder-calc">Find Inspector Calc</Link>
+          </li>
+          <li>
+            <Link to = "/inspector-distance-calc">Find Distance Calc</Link>
           </li>
           <li>
             <Link to = "/inspectors">Inspectors</Link>
@@ -42,6 +51,8 @@ function App() {
         <Route path = "/inspectors" element = {<InspectorList />} />
         <Route path = "/add-inspector" element = {<CreateInspector />}/>
         <Route path = "/edit-inspector/:id" element = {<EditInspector />} /> 
+        <Route path = "/inspector-finder-calc" element = {<InspectorFinder />} /> 
+        <Route path = "/inspector-distance-calc" element = {<DistanceCalculator />} />
       </Routes>
     </Router>
 

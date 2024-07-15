@@ -82,7 +82,7 @@ function InspectorFind() {
 
     return (
         <>
-            <h1>Find Inspectors</h1>
+            <h1>Use the Other One Find Inspectors</h1>
             <form onSubmit={handleFindInspectors}>
                 <label>
                     Postcode:

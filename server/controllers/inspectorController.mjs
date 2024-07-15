@@ -2,13 +2,14 @@ import { openDb } from '../db.mjs';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import csv from 'csv-parser';
-import path from 'path';
+import path, { parse } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { pipeline } from 'stream';
 import { createReadStream } from 'fs';
 import { geocodePostcode, getCountryCode } from './geoCoding.mjs';
 import { importInspectorsFromCSV } from './importInspectorsFromCSV.mjs';
+import { response } from 'express';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -116,7 +117,104 @@ export const deleteInspector = async (req, res) => {
     }
 };
 
+export const calculateAndGetInspectorsByDistance = async (req, res) => {
+    try {
+        console.log('Received request:', req.query);
 
+        const { postcode, country, limit = 5, sortBy = 'distance', sortOrder = 'asc' } = req.query;
+
+        if (!postcode || !country) {
+            console.error('Missing postcode');
+            return res.status(400).send('Missing postcode or country');
+
+        }
+
+        const { latitude, longitude } = await geocodePostcode(postcode, country);
+    
+        if (isNaN(latitude) || isNaN(longitude)) {
+            console.error('Invalid coordinates:', { latitude, longitude });
+            return res.status(400).send('Invalid coordinates');
+        }
+
+        console.log('User location:', { latitude, longitude });
+
+        const db = await openDb();
+        const inspectors = await db.all('SELECT * FROM inspectors');
+        console.log('Inspectors:', inspectors);
+
+        let inspectorsWithDistance = inspectors.map(inspector => {
+            const distance = calculateDistance(latitude, longitude, inspector.latitude, inspector.longitude);
+            return { ...inspector, distance };
+        });
+
+        // Sort the inspectors
+        inspectorsWithDistance.sort((a, b) => {
+            if (sortBy === 'distance') {
+                return sortOrder === 'asc' ? a.distance - b.distance : b.distance - a.distance;
+            } else if (sortBy === 'name') {
+                return sortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+            }
+            // Add more sorting conditions as needed
+        });
+
+        // Limit the results
+        inspectorsWithDistance = inspectorsWithDistance.slice(0, parseInt(limit));
+
+        console.log('Inspectors with distance before sending:', inspectorsWithDistance);
+
+        const response = {
+            origin: { latitude, longitude },
+            inspectors: inspectorsWithDistance.map(inspector => ({
+                ...inspector,
+                latitude: parseFloat(inspector.latitude),
+                longitude: parseFloat(inspector.longitude),
+                distance: inspector.distance !== undefined ? parseFloat(inspector.distance.toFixed(2)) : null
+            }))
+        };
+
+        console.log('Response object:', JSON.stringify(response, null, 2));
+
+        return res.json(response);
+    } catch (error) {
+        console.error('Error in calculateAndGetInspectorsByDistance:', error);
+        return res.status(500).json({ error: 'Internal Server Error', details: error.message });
+    }
+};
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    // Haversine formula
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c; // Distance in km
+    return distance;
+}
+
+function deg2rad(deg) {
+    return deg * (Math.PI/180);
+}
+
+
+
+export const getCountries = async (req, res) => {
+    try {
+        const db = await openDb();
+        const countries = await db.all('SELECT country_name, country_code FROM country_codes');
+        console.log('Fetched country codes:', countries);
+        res.json(countries);
+    } catch (error) {
+        console.error('Error fetching countries:', error);
+        res.status(500).send('Server Error');
+    }
+};
+
+
+/*
 export const getInspectorsByDistance = async (req, res) => {
     console.log('getInspectorsByDistance called')
     try {
@@ -205,17 +303,9 @@ export const getInspectorsByDistance = async (req, res) => {
         res.status(500).send('Server Error');
     }
 }
+*/
 
-export const getCountries = async (req, res) => {
-    try {
-        const db = await openDb();
-        const countries = await db.all('SELECT country_name, country_code FROM country_codes');
-        res.json(countries);
-    } catch (error) {
-        console.error('Error fetching countries:', error);
-        res.status(500).send('Server Error');
-    }
-};
+
 
 /*
 
