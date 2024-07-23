@@ -11,7 +11,8 @@ const InspectorFinder = () => {
   const [countries, setCountries] = useState([]);
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
-
+  const [loadedCount, setLoadedCount] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
 
 
   useEffect(() => {
@@ -34,44 +35,87 @@ const InspectorFinder = () => {
     fetchCountryCodes();
   }, []);
 
-  const fetchInspectors = async (e) => {
-    e.preventDefault(); // Prevent form submission
-    setError(null); // Clear any previous errors
-    
-    try {    
-      const response = await axios.get('http://localhost:3001/api/inspectors/distancecalc', {
-        params: {postcode, country, sortBy, sortOrder}
-             
-        }); 
-        setInspectors(response.data.inspectors); 
-    } catch (error) {
-        setError('Error fetching inspectors. Please try again.');
-        }
-      };
+  const fetchInspectors = async (e, loadMore = false) => {
+    if (e) e.preventDefault();
 
-    const handleSort = (column) => {
-    if (sortBy === column) {
-        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-        setSortBy(column);
-        setSortOrder('asc');
+    // Reset everything if it's a new search
+    if (!loadMore) {
+        setError(null);
+        setInspectors([]);
+        setLoadedCount(0);
+        setHasMore(true);
     }
-    };
+    
+    if(!postcode || !country) {
+        setError('Please enter a postcode and select a country');
+        return;
+    }
 
-  /*    console.log('API response:', response.data);
-      
-      if (response.data && response.data.origin && Array.isArray(response.data.inspectors)) {
-        setOrigin(response.data.origin);
-        setInspectors(response.data.inspectors);
-      } else {
-        setError('Unexpected data structure returned from API');
-      }
+    const currentOffset = loadMore ? loadedCount : 0;
+    console.log('About to make API call with offset:', currentOffset);
+
+    try {    
+        const response = await axios.get('http://localhost:3001/api/inspectors/distancecalc', {
+            params: {
+                postcode,
+                country,
+                sortBy: 'distance',
+                sortOrder: 'asc',
+                offset: currentOffset.toString(),
+                limit: 10,
+            },
+        });
+        console.log('API response:', response.data);
+
+        if (response.data.inspectors.length === 0) {
+            setHasMore(false);
+            if (!loadMore) {
+                setError('No inspectors found for this location.');
+            }
+            return;
+        }
+
+        if (loadMore) {
+            setInspectors(prevInspectors => [...prevInspectors, ...response.data.inspectors]);
+        } else {
+            setInspectors(response.data.inspectors);
+        }
+        
+        setLoadedCount(prevCount => prevCount + response.data.inspectors.length);
+        
+        if (response.data.origin && !loadMore) {
+            setOrigin(response.data.origin);
+        }
+
+        // Check if we've loaded all available inspectors
+        if (response.data.inspectors.length < 10 || (loadedCount + response.data.inspectors.length) >= response.data.totalCount) {
+            setHasMore(false);
+        }
     } catch (error) {
-      console.error('Error fetching inspectors:', error);
-      setError('Error fetching inspectors. Please try again.');
-    };
+        console.error('Error fetching inspectors:', error);
+        setError('Error fetching inspectors. Please try again.');
+        setHasMore(false);
+    }
+};
 
-*/
+    
+    const handleSort = (column) => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+        
+        // Sort the current list of inspectors
+        const sortedInspectors = [...inspectors].sort((a, b) => {
+          if (column === 'distance') {
+            return newSortOrder === 'asc' ? a.distance - b.distance : b.distance - a.distance;
+          } else if (column === 'name') {
+            return newSortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+          }
+          return 0;
+        });
+    
+        setInspectors(sortedInspectors);
+    };
 
   return (
     <div>
@@ -85,12 +129,12 @@ const InspectorFinder = () => {
                 required
                 >
             <option key="default" value="">Select a country ({countries.length} countries loaded)</option>
-            {Array.isArray(countries) && countries.map((country, index) => (
+            {countries.map((country) => (
                     <option 
-                    key={country.code || `country-${index}`} 
-                    value={country.code || ''}
+                    key={country.code} 
+                    value={country.code}
                     >
-                    {country.name || 'Unknown Country'}
+                    {country.name}
                 </option>
                 ))}
             </select>
@@ -100,11 +144,13 @@ const InspectorFinder = () => {
         {error && <div>{error}</div>}
 
         {inspectors.length > 0 && (
+            <div>
+                {origin && <p>Origin: {origin.latitude}, {origin.longitude}</p>}
         <table>
           <thead>
             <tr>
-              <th onClick={() => handleSort('name')}>Name</th>
-              <th onClick={() => handleSort('distance')}>Distance</th>
+              <th onClick={() => handleSort('name')}>Name {sortBy === 'name' && (sortOrder ==='asc' ? '▲' : '▼')}</th>
+              <th onClick={() => handleSort('distance')}>Distance {sortBy === 'distance' && (sortOrder === 'asc' ? '▲' : '▼')}</th>
             </tr>
           </thead>
           <tbody>
@@ -116,12 +162,47 @@ const InspectorFinder = () => {
             ))}
           </tbody>
         </table>
-      )}
+        {hasMore && inspectors.length > 0 && (
+        <button onClick={(e) => fetchInspectors(e, true)}>Load More</button>
+        )}
+        </div>
+    )}
+ 
+
+        
+      
     </div>
+   
   );
+
 };
-/*
-        {origin && inspectors.length > 0 && (
+
+
+export default InspectorFinder;
+
+  /*    
+  
+      useEffect(() => {
+        if(postcode && country) {
+            fetchInspectors();
+        }
+    }, [sortBy, sortOrder]);
+  
+  console.log('API response:', response.data);
+      
+      if (response.data && response.data.origin && Array.isArray(response.data.inspectors)) {
+        setOrigin(response.data.origin);
+        setInspectors(response.data.inspectors);
+      } else {
+        setError('Unexpected data structure returned from API');
+      }
+    } catch (error) {
+      console.error('Error fetching inspectors:', error);
+      setError('Error fetching inspectors. Please try again.');
+    };
+
+
+    {origin && inspectors.length > 0 && (
         <DistanceCalculator 
           originLat={origin.latitude}
           originLon={origin.longitude}
@@ -133,23 +214,4 @@ const InspectorFinder = () => {
         />
       )}
 
-      <h2>Inspectors</h2>
-      {inspectors.length > 0 ? (
-        <ul>
-            {inspectors.map(inspector => (
-                <li key={inspector.id || `${inspector.latitude}-${inspector.longitude}`}>
-                    {inspector.name} - Lat: {inspector.latitude}, Lon: {inspector.longitude}
-                </li>
-                ))}
-        </ul>
-      ) : <p>No inspectors found</p>}
-
-    </div>
-   
-  );
-
-};
 */
-
-export default InspectorFinder;
-

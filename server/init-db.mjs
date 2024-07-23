@@ -126,8 +126,7 @@ const initDb = async () => {
             ('Russells (Kirbymoorside) Ltd Leyburn', 'email', 'United Kingdom', 'EH2 1JE', 'Deutz-Fahr',54.3258374,-1.8482828),
             ('Rhodri Williams', 'email', 'United Kingdom', 'EH2 1JE', 'Deutz-Fahr',51.734698,-4.1451248),
             ('Agri-Service (Michael Lloyd Yates)', 'email', 'United Kingdom', 'EH2 1JE', 'Deutz-Fahr',51.186392,1.229855),
-            ('Ravenhill Ltd', 'email', 'United Kingdom', 'EH2 1JE', 'Deutz-Fahr',57.599941,-4.4451289),
-            ('Haddington - Lloyd Ltd', 'email', 'United Kingdom', 'EH2 1JE', 'Deutz-Fahr', 55.958674,-2.774864)
+            ('Ravenhill Ltd', 'email', 'United Kingdom', 'EH2 1JE', 'Deutz-Fahr',57.599941,-4.4451289)
             
             ;
         `);
