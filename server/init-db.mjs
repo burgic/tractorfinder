@@ -29,7 +29,7 @@ const initDb = async () => {
 
         CREATE TABLE IF NOT EXISTS brands (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT
+            brand_name TEXT
         );
 
         INSERT INTO country_codes (country_name, country_code) VALUES
@@ -55,13 +55,17 @@ const initDb = async () => {
             ('Poland', 'PL'),
             ('Czech Republic', 'CZ');
 
-        INSERT INTO brands (name) VALUES 
+        INSERT INTO brands (brand_name) VALUES 
             ('Kubota'), 
             ('Caterpillar'), 
             ('Fendt'), 
             ('Valtra'), 
             ('Claas'), 
             ('Deutz-Fahr'), 
+            ('Massey Ferguson'),
+            ('John Deere'),
+            ('Case IH'),
+            ('New Holland'),
             ('JCB'), 
             ('McCormick');
 

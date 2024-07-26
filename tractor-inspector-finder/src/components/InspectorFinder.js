@@ -13,6 +13,8 @@ const InspectorFinder = () => {
   const [sortOrder, setSortOrder] = useState('asc');
   const [loadedCount, setLoadedCount] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [brands_inspected, setBrandsInspected] = useState([]);
+  const [selectedBrand, setSelectedBrand] = useState('');
 
 
   useEffect(() => {
@@ -34,6 +36,31 @@ const InspectorFinder = () => {
 
     fetchCountryCodes();
   }, []);
+
+  useEffect(() => {
+    const fetchBrands = async () => {
+        try {
+            const response = await axios.get('http://localhost:3001/api/brands');
+            setBrandsInspected(response.data.map(brand => ({
+                brand_name: brand.brand_name
+            })));
+        } catch (error) {
+            console.error('Error fetching brands:', error);
+            setError('Error fetching brands. Please try again.');
+        }
+    }
+    fetchBrands();
+}, []);
+
+  const deleteInspector = async (id) => {
+    try {
+        await axios.delete(`http://localhost:3001/api/inspectors/${id}`);
+        setInspectors(inspectors.filter(inspector => inspector.id !== id));
+    } catch(error) {
+        console.error('Error deleting inspector:', error);
+        setError('Error deleting inspector. Please try again.');
+    }
+  }
 
   const fetchInspectors = async (e, loadMore = false) => {
     if (e) e.preventDefault();
@@ -59,8 +86,9 @@ const InspectorFinder = () => {
             params: {
                 postcode,
                 country,
-                sortBy: 'distance',
-                sortOrder: 'asc',
+                brands_inspected: selectedBrand,
+                sortBy: sortBy,
+                sortOrder: sortOrder,
                 offset: currentOffset.toString(),
                 limit: 10,
             },
@@ -78,7 +106,10 @@ const InspectorFinder = () => {
         if (loadMore) {
             setInspectors(prevInspectors => [...prevInspectors, ...response.data.inspectors]);
         } else {
-            setInspectors(response.data.inspectors);
+            setInspectors(response.data.inspectors.map(inspector => ({
+                ...inspector,
+                brands_inspected: inspector.brands_inspected || 'Not specified'  // Assuming brands_inspected comes from the API
+              })));
         }
         
         setLoadedCount(prevCount => prevCount + response.data.inspectors.length);
@@ -106,7 +137,9 @@ const InspectorFinder = () => {
         
         // Sort the current list of inspectors
         const sortedInspectors = [...inspectors].sort((a, b) => {
-          if (column === 'distance') {
+          if (column === 'brands_inspected') {
+            return newSortOrder === 'asc' ? a.brands_inspected.localeCompare(b.brands_inspected) : b.brands_inspected.localeCompare(a.brands_inspected);
+        } else if (column === 'distance') {
             return newSortOrder === 'asc' ? a.distance - b.distance : b.distance - a.distance;
           } else if (column === 'name') {
             return newSortOrder === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
@@ -138,6 +171,15 @@ const InspectorFinder = () => {
                 </option>
                 ))}
             </select>
+
+            <select value = {selectedBrand} onChange = {e => setSelectedBrand(e.target.value)} required>
+                <option key = "default" value = "">Select a brand</option>
+                {brands_inspected.map((brand, index) => (
+                    <option key = {index} value = {brand.brand_name}>{brand.brand_name}</option>
+                    
+                ))}
+            </select>
+
             <button type="submit">Find Inspectors</button>
         </form>
 
@@ -151,6 +193,7 @@ const InspectorFinder = () => {
             <tr>
               <th onClick={() => handleSort('name')}>Name {sortBy === 'name' && (sortOrder ==='asc' ? '▲' : '▼')}</th>
               <th onClick={() => handleSort('distance')}>Distance {sortBy === 'distance' && (sortOrder === 'asc' ? '▲' : '▼')}</th>
+              <th onClick={() => handleSort('brands_inspected')}>Brands Inspected {sortBy === 'brands_inspected' && (sortOrder === 'asc' ? '▲' : '▼')}</th>
             </tr>
           </thead>
           <tbody>
@@ -158,6 +201,8 @@ const InspectorFinder = () => {
               <tr key={inspector.id}>
                 <td>{inspector.name}</td>
                 <td>{inspector.distance ? inspector.distance.toFixed(2) : 'N/A'} km</td>
+                <td>{inspector.brands_inspected}</td>
+                <td><button onClick = {() => deleteInspector(inspector.id)}>Delete</button></td>
               </tr>
             ))}
           </tbody>

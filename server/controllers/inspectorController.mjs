@@ -121,19 +121,18 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
     try {
         console.log('Received request:', req.query);
 
-        const { postcode, country, limit = 10, offset = 0, sortBy = 'distance', sortOrder = 'asc' } = req.query;
+        const { postcode, country, brands_inspected, limit = 10, offset = 0, sortBy = 'distance', sortOrder = 'asc' } = req.query;
         
         const parsedLimit = parseInt(limit);
-        const parsedOffset = parseInt(offset) || 0; // Use 0 as default if offset is missing
+        const parsedOffset = parseInt(offset) || 0;
         console.log('Received offset:', offset, 'Parsed offset:', parsedOffset);
         
-        
-        if (isNaN(parsedLimit) || isNaN(parsedOffset) || parsedLimit <1 || parsedOffset <0 ) {
+        if (isNaN(parsedLimit) || isNaN(parsedOffset) || parsedLimit < 1 || parsedOffset < 0) {
             return res.status(400).send('Invalid limit or offset');
         }
 
         if (!postcode || !country) {
-            console.error('Missing postcode');
+            console.error('Missing postcode or country');
             return res.status(400).send('Missing postcode or country');
         }
 
@@ -148,6 +147,50 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
 
         const db = await openDb();
 
+        let query = `
+            SELECT *,
+                (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance
+            FROM inspectors
+        `;
+
+        const queryParams = [latitude, longitude, latitude];
+
+        if (brands_inspected && brands_inspected !== '') {
+            query += ` WHERE brands_inspected LIKE ?`;
+            queryParams.push(`%${brands_inspected}%`);
+        }
+
+        query += ` ORDER BY ${sortBy === 'distance' ? 'distance' : 'name'} ${sortOrder.toUpperCase()}`;
+        query += ` LIMIT ? OFFSET ?`;
+        queryParams.push(parsedLimit, parsedOffset);
+
+        const inspectors = await db.all(query, queryParams);
+        console.log('Inspectors:', inspectors.length);
+
+        const totalCountResult = await db.get('SELECT COUNT(*) as count FROM inspectors');
+        const totalCount = totalCountResult.count;
+
+        const response = {
+            origin: { latitude, longitude },
+            inspectors: inspectors.map(inspector => ({
+                ...inspector,
+                distance: parseFloat(inspector.distance.toFixed(2)),
+                latitude: parseFloat(inspector.latitude),
+                longitude: parseFloat(inspector.longitude)
+            })),
+            totalCount: totalCount
+        };
+
+        console.log('Response object:', JSON.stringify(response, null, 2));
+
+        return res.json(response);
+    } catch (error) {
+        console.error('Error in calculateAndGetInspectorsByDistance:', error);
+        return res.status(500).json({ error: 'Internal Server Error', details: error.message });
+    }
+};
+
+/*
         const totalCountResult = await db.get(`
             SELECT COUNT(*) as count
             FROM inspectors
@@ -176,9 +219,9 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
             totalCount: totalCount
         };
 
-        console.log('Response object:', JSON.stringify(response, null, 2));
+        
 
-        /* Sort the inspectors
+        Sort the inspectors
         inspectorsWithDistance.sort((a, b) => {
             if (sortBy === 'distance') {
                 return sortOrder === 'asc' ? a.distance - b.distance : b.distance - a.distance;
@@ -209,12 +252,7 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
             totalCount: totalCount
         };
         */
-        return res.json(response);
-    } catch (error) {
-        console.error('Error in calculateAndGetInspectorsByDistance:', error);
-        return res.status(500).json({ error: 'Internal Server Error', details: error.message });
-    }
-};
+
 
 
 
@@ -232,6 +270,18 @@ export const getCountries = async (req, res) => {
     }
 };
 
+export const getBrands = async (req, res) => {
+    try {
+        const db = await openDb();
+        const brands = await db.all('SELECT brand_name FROM brands');
+        console.log('Fetched brands:', brands);
+        res.json(brands);
+    } catch (error) {
+        console.error('Error fetching brands:', error);
+        res.status(500).send('Server Error');
+
+    }
+};
 
 /*
 

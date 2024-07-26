@@ -1,7 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import { openDb } from './db.mjs';
-import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector,  getCountries, calculateAndGetInspectorsByDistance } from './controllers/inspectorController.mjs'; // getInspectorsByDistance ,
+import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector,  getCountries, calculateAndGetInspectorsByDistance, getBrands } from './controllers/inspectorController.mjs'; // getInspectorsByDistance ,
 import { importInspectorsFromCSV } from './controllers/importInspectorsFromCSV.mjs';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -38,6 +38,7 @@ app.get('/api/inspectors/:id', getInspectorById);
 app.post('/api/inspectors/import', upload.single('file'), importInspectorsFromCSV);
 app.get('/api/inspectors', getInspectors);
 app.get('/api/countries', getCountries);
+app.get('/api/brands', getBrands);
 app.get('/api/country-codes', getCountries);
 app.put('/api/inspectors/:id', updateInspector);
 app.post('/api/inspectors', createInspector);
