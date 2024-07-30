@@ -15,6 +15,7 @@ const InspectorFinder = () => {
   const [hasMore, setHasMore] = useState(true);
   const [brands_inspected, setBrandsInspected] = useState([]);
   const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedBrands, setSelectedBrands] = useState([]);
 
 
   useEffect(() => {
@@ -62,6 +63,12 @@ const InspectorFinder = () => {
     }
   }
 
+
+  const handleBrandChange = (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    setSelectedBrands(selectedOptions);
+  };
+
   const fetchInspectors = async (e, loadMore = false) => {
     if (e) e.preventDefault();
 
@@ -86,12 +93,22 @@ const InspectorFinder = () => {
             params: {
                 postcode,
                 country,
-                brands_inspected: selectedBrand,
+                brands_inspected: selectedBrands,
                 sortBy: sortBy,
                 sortOrder: sortOrder,
                 offset: currentOffset.toString(),
                 limit: 10,
             },
+            paramsSerializer: params => {
+                return Object.entries(params)
+                  .map(([key, value]) => {
+                    if (Array.isArray(value)) {
+                      return value.map(v => `${key}=${encodeURIComponent(v)}`).join('&');
+                    }
+                    return `${key}=${encodeURIComponent(value)}`;
+                  })
+                  .join('&');
+              }
         });
         console.log('API response:', response.data);
 
@@ -172,7 +189,7 @@ const InspectorFinder = () => {
                 ))}
             </select>
 
-            <select value = {selectedBrand} onChange = {e => setSelectedBrand(e.target.value)} required>
+            <select multiple value = {selectedBrands} onChange = {handleBrandChange} required>
                 <option key = "default" value = "">Select a brand</option>
                 {brands_inspected.map((brand, index) => (
                     <option key = {index} value = {brand.brand_name}>{brand.brand_name}</option>

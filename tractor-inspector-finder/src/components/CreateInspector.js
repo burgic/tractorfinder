@@ -60,48 +60,6 @@ function CreateInspector(){
     }, []);
     
 
-/*
-
-      useEffect(() => {
-        const fetchCountries = async () => {
-            try {
-                const response = await axios.get('http://localhost:3001/api/countries');
-                console.log('Received countries:', response.data);
-                const uniqueCountries = Array.from(new Set(response.data.map(c => c.country_code)))
-                    .map(country_code => {
-                        return response.data.find(c => c.country_code === country_code);
-                    });
-                setCountries(uniqueCountries);
-            } catch (error) {
-                console.error('Error fetching countries:', error);
-                setError('Error fetching countries. Please try again.');
-            }
-        };
-        fetchCountries();
-    }, []);
-
-        useEffect(() => {
-        // Fetch country codes when component mounts
-        const fetchCountryCodes = async () => {
-          try {
-            console.log('Fetching country codes');
-            const response = await axios.get('http://localhost:3001/api/country-codes');
-            console.log('Country codes:', response.data);
-            setCountries(response.data.map(country => ({
-                code: country.country_code,
-                name: country.country_name
-          }))); 
-          } catch (error) {
-            console.error('Error fetching country codes:', error);
-            setError('Error fetching country codes. Please try again.');
-          }
-        };
-    
-        fetchCountryCodes();
-      }, []);
-
-       <input type = "text" value = {brandsInspected} onChange = {e => setBrandsInspected(e.target.value)} />
-*/
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -114,7 +72,7 @@ function CreateInspector(){
                 contact_info: contactInfo,
                 country,
                 postcode: postCode,
-                brands_inspected: brandsInspected,
+                brands_inspected: JSON.stringify(brandsInspected),
             });
             setSuccessMessage('Inspector added successfully');
             setErrorMessage('');
@@ -166,6 +124,16 @@ function CreateInspector(){
     }
     };
 
+    const handleBrandsChange = (brandName) => {
+        setBrandsInspected(prev => {
+            if (prev.includes(brandName)) {
+                return prev.filter(b => b !== brandName);
+            } else {
+                return [...prev, brandName];
+            }
+        });
+    };
+
     return (
         <div>
             <h1>Create Inspector</h1>
@@ -201,18 +169,19 @@ function CreateInspector(){
                     <label>Postcode</label>
                     <input type = "text" value = {postCode} onChange = {e => setPostcode(e.target.value)} />
                 </div>
-                <div>
+                
                     <label>Brands Inspected</label>
-                    <select value={brandsInspected} onChange={(e) => setBrandsInspected(e.target.value)} required>
-                        <option key="default" value="">Select a brand</option>
-                        {brands.map((brand, index) => (
-                            <option key={`${brand.brand_name}-${index}`} value={brand.brand_name}>
-                                {brand.brand_name}
-                            </option>
-                        ))}
-                    </select>
-                   
-                </div>
+                    {brands.map((brand, index) => (
+                        <div key={index}>
+                            <input
+                                type="checkbox"
+                                id={`brand-${index}`}
+                                checked={brandsInspected.includes(brand.brand_name)}
+                                onChange={() => handleBrandsChange(brand.brand_name)}
+                            />
+                            <label htmlFor={`brand-${index}`}>{brand.brand_name}</label>
+                        </div>
+                    ))}
                 <button type = "submit">Create Inspector</button>
             </form>
             
@@ -234,3 +203,48 @@ function CreateInspector(){
 }
 
 export default CreateInspector;
+
+
+
+/*
+
+      useEffect(() => {
+        const fetchCountries = async () => {
+            try {
+                const response = await axios.get('http://localhost:3001/api/countries');
+                console.log('Received countries:', response.data);
+                const uniqueCountries = Array.from(new Set(response.data.map(c => c.country_code)))
+                    .map(country_code => {
+                        return response.data.find(c => c.country_code === country_code);
+                    });
+                setCountries(uniqueCountries);
+            } catch (error) {
+                console.error('Error fetching countries:', error);
+                setError('Error fetching countries. Please try again.');
+            }
+        };
+        fetchCountries();
+    }, []);
+
+        useEffect(() => {
+        // Fetch country codes when component mounts
+        const fetchCountryCodes = async () => {
+          try {
+            console.log('Fetching country codes');
+            const response = await axios.get('http://localhost:3001/api/country-codes');
+            console.log('Country codes:', response.data);
+            setCountries(response.data.map(country => ({
+                code: country.country_code,
+                name: country.country_name
+          }))); 
+          } catch (error) {
+            console.error('Error fetching country codes:', error);
+            setError('Error fetching country codes. Please try again.');
+          }
+        };
+    
+        fetchCountryCodes();
+      }, []);
+
+       <input type = "text" value = {brandsInspected} onChange = {e => setBrandsInspected(e.target.value)} />
+*/

@@ -155,9 +155,10 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
 
         const queryParams = [latitude, longitude, latitude];
 
-        if (brands_inspected && brands_inspected !== '') {
-            query += ` WHERE brands_inspected LIKE ?`;
-            queryParams.push(`%${brands_inspected}%`);
+        if (brands_inspected && brands_inspected.length > 0) {
+            const brandsArray = Array.isArray(brands_inspected) ? brands_inspected : [brands_inspected];
+            query += ` WHERE brands_inspected IN (${brandsArray.map(() => '?').join(',')})`;
+            queryParams.push(...brandsArray);
         }
 
         query += ` ORDER BY ${sortBy === 'distance' ? 'distance' : 'name'} ${sortOrder.toUpperCase()}`;
@@ -190,8 +191,35 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
     }
 };
 
+
+export const getCountries = async (req, res) => {
+    try {
+        const db = await openDb();
+        const countries = await db.all('SELECT country_name, country_code FROM country_codes');
+        console.log('Fetched country codes:', countries);
+        res.json(countries);
+    } catch (error) {
+        console.error('Error fetching countries:', error);
+        res.status(500).send('Server Error');
+    }
+};
+
+export const getBrands = async (req, res) => {
+    try {
+        const db = await openDb();
+        const brands = await db.all('SELECT brand_name FROM brands');
+        console.log('Fetched brands:', brands);
+        res.json(brands);
+    } catch (error) {
+        console.error('Error fetching brands:', error);
+        res.status(500).send('Server Error');
+
+    }
+};
+
 /*
-        const totalCountResult = await db.get(`
+
+ const totalCountResult = await db.get(`
             SELECT COUNT(*) as count
             FROM inspectors
         `);
@@ -251,39 +279,6 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
             })),
             totalCount: totalCount
         };
-        */
-
-
-
-
-
-
-export const getCountries = async (req, res) => {
-    try {
-        const db = await openDb();
-        const countries = await db.all('SELECT country_name, country_code FROM country_codes');
-        console.log('Fetched country codes:', countries);
-        res.json(countries);
-    } catch (error) {
-        console.error('Error fetching countries:', error);
-        res.status(500).send('Server Error');
-    }
-};
-
-export const getBrands = async (req, res) => {
-    try {
-        const db = await openDb();
-        const brands = await db.all('SELECT brand_name FROM brands');
-        console.log('Fetched brands:', brands);
-        res.json(brands);
-    } catch (error) {
-        console.error('Error fetching brands:', error);
-        res.status(500).send('Server Error');
-
-    }
-};
-
-/*
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
     // Haversine formula
