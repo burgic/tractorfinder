@@ -48,3 +48,5 @@ const DistanceCalculator = ({ originLat, originLon, destinations }) => {
 };
 
 export default DistanceCalculator;
+
+*/
