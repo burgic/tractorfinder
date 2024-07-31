@@ -1,3 +1,5 @@
+/*
+
 import React, { useEffect, useState } from 'react';
 
 const DistanceCalculator = ({ originLat, originLon, destinations }) => {
