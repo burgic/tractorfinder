@@ -16,6 +16,7 @@ function CreateInspector(){
     const [countries, setCountries] = useState([]);
     const [error, setError] = useState('');
     const [brands, setBrands] = useState([]);
+    const [cost_mile, setCostMile] = useState('');
 
 
     useEffect(() => {
@@ -59,31 +60,6 @@ function CreateInspector(){
         fetchBrands();
     }, []);
     
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            if (csvData) {
-                const response = await axios.post('http://localhost:3001/api/inspectors/import', csvData);
-                console.log('Import successful:', response.data);
-            } else {        
-            const response = await axios.post('http://localhost:3001/api/inspectors', {
-                name,
-                contact_info: contactInfo,
-                country,
-                postcode: postCode,
-                brands_inspected: JSON.stringify(brandsInspected),
-            });
-            setSuccessMessage('Inspector added successfully');
-            setErrorMessage('');
-            console.log('Inspector added:', response.data);
-            }
-        } catch (error) {
-            console.error('Error adding inspector:', error.message);
-            setErrorMessage('Error adding inspector');
-            console.error('Error adding inspector:', error.message);
-        }
-    };
 
     const handleFileChange = (e) => {
         setFile(e.target.files[0]);
@@ -134,6 +110,32 @@ function CreateInspector(){
         });
     };
 
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            if (csvData) {
+                const response = await axios.post('http://localhost:3001/api/inspectors/import', csvData);
+                console.log('Import successful:', response.data);
+            } else {        
+            const response = await axios.post('http://localhost:3001/api/inspectors', {
+                name,
+                contact_info: contactInfo,
+                country,
+                postcode: postCode,
+                cost_mile: cost_mile,
+                brands_inspected: brandsInspected,
+            });
+            setSuccessMessage('Inspector added successfully');
+            setErrorMessage('');
+            console.log('Inspector added:', response.data);
+            }
+        } catch (error) {
+            console.error('Error adding inspector:', error.message);
+            setErrorMessage('Error adding inspector');
+            console.error('Error adding inspector:', error.message);
+        }
+    };
+
     return (
         <div>
             <h1>Create Inspector</h1>
@@ -169,6 +171,11 @@ function CreateInspector(){
                     <label>Postcode</label>
                     <input type = "text" value = {postCode} onChange = {e => setPostcode(e.target.value)} />
                 </div>
+                <div>
+                    <label>Cost per Mile</label>
+                    <input type = "number" value = {cost_mile} onChange = {e => setCostMile(e.target.value)} />
+                </div>
+
                 
                     <label>Brands Inspected</label>
                     {brands.map((brand, index) => (

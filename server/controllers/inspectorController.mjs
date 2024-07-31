@@ -22,8 +22,8 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 
 const validateInspectorData = (data) => {
-    const { name, contact_info, postcode, country, brands_inspected } = data;
-    if (!name || !contact_info || !postcode || !country ||!brands_inspected) {
+    const { name, contact_info, postcode, country, brands_inspected, cost_mile } = data;
+    if (!name || !contact_info || !postcode || !country ||!brands_inspected ||!cost_mile) {
         throw new Error('Missing required fields');
     }
 };
@@ -33,7 +33,11 @@ export const getInspectors = async (req, res) => {
     try {
         const db = await openDb();
         const inspectors = await db.all('SELECT * FROM inspectors');
-        res.json(inspectors);
+        const parsedInspectors = inspectors.map(inspector => ({
+            ...inspector,
+            brands_inspected: JSON.parse(inspector.brands_inspected)
+        }));
+        res.json(parsedInspectors);
     } catch (error) {
         console.error(error);
         res.status(500).send('Server Error');
@@ -42,7 +46,7 @@ export const getInspectors = async (req, res) => {
 
 
 export const createInspector = async (req, res) => {
-    const { name, contact_info, country, postcode, brands_inspected, latitude, longitude } = req.body;
+    const { name, contact_info, country, postcode, brands_inspected, cost_mile, latitude, longitude } = req.body;
     try {
         validateInspectorData(req.body);
         const countryCode = await getCountryCode(country);
@@ -52,15 +56,20 @@ export const createInspector = async (req, res) => {
         // const longitude = 0.0; // Default value for longitude
         // const { latitude, longitude } = await geocodePostcode(postcode, country);
 
+        console.log('brands_inspected before stringfy:', brands_inspected);
+
+        const brandsJSON = JSON.stringify(brands_inspected);
+
+        console.log('brands_inspected after stringfy:', brandsJSON);
         console.log('Geocoded data:', { latitude, longitude })
 
         const db = await openDb();
         const result = await db.run(
-            'INSERT INTO inspectors (name, contact_info, country, postcode, brands_inspected, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [name, contact_info, country, postcode, brands_inspected, latitude, longitude]
+            'INSERT INTO inspectors (name, contact_info, country, postcode, brands_inspected, cost_mile, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, contact_info, country, postcode, brandsJSON, cost_mile, latitude, longitude]
         );
         // const inspector = await db.get('SELECT * FROM inspectors WHERE id = last_insert_rowid()');
-        console.log(`Inspector created with Latitude: ${latitude}, Longitude: ${longitude}`);
+        console.log(`Inspector created with ID: ${result.lastID}, Latitude: ${latitude}, Longitude: ${longitude}`);
         res.json({ success: true, message: 'Inspector created successfully', inspectorId: result.lastID});
     } catch (error) {
         console.error('Database error:', error);
@@ -73,6 +82,10 @@ export const getInspectorById = async (req, res) => {
     try {
         const db = await openDb();
         const inspector = await db.get('SELECT * FROM inspectors WHERE id = ?', [id]);
+        const parsedInspectors = inspectors.map(inspector => ({
+            ... inspector,
+            brands_inspected: JSON.parse(inspector.brands_inspected)
+        }));
         if (inspector) {
             res.json(inspector);
         } else {
@@ -85,15 +98,15 @@ export const getInspectorById = async (req, res) => {
 
 export const updateInspector = async (req, res) => {
         const { id } = req.params;
-        const { name, contact_info, country, postcode, brands_inspected } = req.body;
+        const { name, contact_info, country, postcode, brands_inspected, cost_mile } = req.body;
     try {
 
         const countryCode = await getCountryCode(country);
         const { latitude, longitude } = await geocodePostcode(postcode, countryCode);
         const db = await openDb();
         await db.run(
-            'UPDATE inspectors SET name = ?, contact_info = ?, country = ?, postcode = ?, brands_inspected = ?, latitude = ?, longitude =? WHERE id = ?',
-            [name, contact_info, country, postcode, brands_inspected, latitude, longitude, id]
+            'UPDATE inspectors SET name = ?, contact_info = ?, country = ?, postcode = ?, brands_inspected = ?, cost_mile = ?, latitude = ?, longitude =? WHERE id = ?',
+            [name, contact_info, country, postcode, brands_inspected, cost_mile, latitude, longitude, id]
         );
         const inspector = await db.get('SELECT * FROM inspectors WHERE id = ?', [id]);
         res.json(inspector);
@@ -157,8 +170,13 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
 
         if (brands_inspected && brands_inspected.length > 0) {
             const brandsArray = Array.isArray(brands_inspected) ? brands_inspected : [brands_inspected];
-            query += ` WHERE brands_inspected IN (${brandsArray.map(() => '?').join(',')})`;
-            queryParams.push(...brandsArray);
+            query += ` WHERE (`;
+            brandsArray.forEach((brand, index) => {
+                if (index > 0) query += ' OR ';
+                query += `json_valid(brands_inspected) AND json_extract(brands_inspected, '$') LIKE ?`;
+                queryParams.push(`%${brand}%`);
+            });
+            query += ')';
         }
 
         query += ` ORDER BY ${sortBy === 'distance' ? 'distance' : 'name'} ${sortOrder.toUpperCase()}`;
@@ -177,7 +195,10 @@ export const calculateAndGetInspectorsByDistance = async (req, res) => {
                 ...inspector,
                 distance: parseFloat(inspector.distance.toFixed(2)),
                 latitude: parseFloat(inspector.latitude),
-                longitude: parseFloat(inspector.longitude)
+                longitude: parseFloat(inspector.longitude),
+                brands_inspected: JSON.parse(inspector.brands_inspected).map(brand => 
+                    typeof brand === 'object' ? JSON.stringify(brand) : brand
+                )
             })),
             totalCount: totalCount
         };
@@ -214,6 +235,31 @@ export const getBrands = async (req, res) => {
         console.error('Error fetching brands:', error);
         res.status(500).send('Server Error');
 
+    }
+};
+
+export const cleanupInspectorData = async () => {
+    try {
+        const db = await openDb();
+        const inspectors = await db.all('SELECT id, brands_inspected FROM inspectors');
+        
+        for (const inspector of inspectors) {
+            let brandsArray;
+            try {
+                brandsArray = JSON.parse(inspector.brands_inspected);
+            } catch (e) {
+                // If it's not valid JSON, assume it's a comma-separated string
+                brandsArray = inspector.brands_inspected.split(',').map(brand => brand.trim());
+            }
+            
+            const brandsJSON = JSON.stringify(brandsArray);
+            
+            await db.run('UPDATE inspectors SET brands_inspected = ? WHERE id = ?', [brandsJSON, inspector.id]);
+        }
+        
+        console.log('Inspector data cleanup completed');
+    } catch (error) {
+        console.error('Error in cleanupInspectorData:', error);
     }
 };
 

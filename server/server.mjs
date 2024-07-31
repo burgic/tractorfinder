@@ -1,7 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import { openDb } from './db.mjs';
-import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector,  getCountries, calculateAndGetInspectorsByDistance, getBrands } from './controllers/inspectorController.mjs'; // getInspectorsByDistance ,
+import { getInspectors, createInspector, getInspectorById, updateInspector, deleteInspector,  getCountries, calculateAndGetInspectorsByDistance, getBrands, cleanupInspectorData } from './controllers/inspectorController.mjs'; // getInspectorsByDistance ,
 import { importInspectorsFromCSV } from './controllers/importInspectorsFromCSV.mjs';
 import dotenv from 'dotenv';
 import cors from 'cors';
@@ -47,9 +47,9 @@ app.delete('/api/inspectors/:id', deleteInspector);
 
 const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log('Server running on http://localhost:3001');
-
+    await cleanupInspectorData();
 });
 
 

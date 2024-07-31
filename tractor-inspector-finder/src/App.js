@@ -24,14 +24,9 @@ function App() {
           <li>
             <Link to = "/login">Login</Link>
           </li>
-          <li>
-            <Link to = "/inspector-find">Find Inspector</Link>
-          </li>
+         
           <li>
             <Link to = "/inspector-finder-calc">Find Inspector Calc</Link>
-          </li>
-          <li>
-            <Link to = "/inspector-distance-calc">Find Distance Calc</Link>
           </li>
           <li>
             <Link to = "/inspectors">Inspectors</Link>
@@ -47,12 +42,11 @@ function App() {
       <Routes>
         <Route path = "/" element={<HomePage />} />
         <Route path = "/login" element = {<Login />} /> 
-        <Route path = "/inspector-find" element = {<InspectorFind />} />
         <Route path = "/inspectors" element = {<InspectorList />} />
         <Route path = "/add-inspector" element = {<CreateInspector />}/>
         <Route path = "/edit-inspector/:id" element = {<EditInspector />} /> 
         <Route path = "/inspector-finder-calc" element = {<InspectorFinder />} /> 
-        <Route path = "/inspector-distance-calc" element = {<DistanceCalculator />} />
+        
       </Routes>
     </Router>
 
